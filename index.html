@@ -1,12 +1,498 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Issues Tracker</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+
+body{
+background:#fff;
+font-family:Inter, sans-serif;
+}
+
+.issue-card{
+border-top:5px solid transparent;
+cursor:pointer;
+transition:.2s;
+}
+
+.issue-card:hover{
+transform:translateY(-3px);
+box-shadow:0 10px 25px rgba(0,0,0,.12);
+}
+
+.open-border{border-top-color:#22c55e;}
+.closed-border{border-top-color:#7c3aed;}
+
+.loader{
+border:4px solid #eee;
+border-top:4px solid #7c3aed;
+border-radius:50%;
+width:40px;
+height:40px;
+animation:spin 1s linear infinite;
+}
+
+@keyframes spin{
+0%{transform:rotate(0)}
+100%{transform:rotate(360deg)}
+}
+
+.modal{
+display:none;
+}
+
+.modal.active{
+display:flex;
+}
+
+</style>
+
 </head>
 <body>
-    hooo
+
+<!-- LOGIN PAGE -->
+
+<div id="loginPage" class="min-h-screen flex items-center justify-center">
+
+<div class="bg-white p-8 rounded-xl shadow w-96">
+
+<div class="text-center mb-6">
+
+<img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="w-16 mx-auto mb-4">
+
+<h2 class="text-xl font-bold">GitHub Issues Tracker</h2>
+
+<p class="text-gray-500 text-sm">Sign in to manage your issues</p>
+
+</div>
+
+<label class="text-sm text-gray-700 block mb-1">Username</label>
+<input id="username" class="border w-full p-2 rounded mb-3" placeholder="Enter Username">
+<p class="text-xs text-purple-600 mb-4">Hint: admin</p>
+
+<label class="text-sm text-gray-700 block mb-1">Password</label>
+<input id="password" type="password" class="border w-full p-2 rounded mb-4" placeholder="Enter Password">
+<p class="text-xs text-purple-600 mb-4">Default: admin123</p>
+
+<button onclick="login()" class="w-full bg-purple-600 text-white p-2 rounded">
+Sign In
+</button>
+
+<div class="text-center text-sm mt-5 text-gray-500">
+OR
+</div>
+
+<div class="bg-gray-100 p-3 rounded mt-3 text-sm text-center">
+Demo Credentials<br>
+<b>Username:</b> admin<br>
+<b>Password:</b> admin123
+</div>
+
+</div>
+
+</div>
+
+
+<!-- MAIN APP -->
+
+<div id="app" class="hidden">
+
+<!-- NAVBAR -->
+
+<div class="bg-white shadow p-4 flex justify-between items-center">
+
+<div class="font-bold text-lg flex items-center gap-2">
+
+<img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" class="w-6">
+
+GitHub Issues Tracker
+
+</div>
+
+<div class="flex gap-2">
+
+<input id="searchInput" placeholder="Search issues..." class="border p-2 rounded">
+
+<button class="bg-purple-600 text-white px-4 rounded">
++ New Issue
+</button>
+
+</div>
+
+</div>
+
+
+<div class="max-w-6xl mx-auto p-6">
+
+<!-- TABS -->
+
+<div class="flex gap-2 mb-4">
+
+<button class="tab px-4 py-1 rounded bg-purple-600 text-white" onclick="setTab('all',this)">All</button>
+<button class="tab px-4 py-1 rounded bg-transparent text-gray-600" onclick="setTab('open',this)">Open</button>
+<button class="tab px-4 py-1 rounded bg-transparent text-gray-600" onclick="setTab('closed',this)">Closed</button>
+
+</div>
+
+
+<!-- SUMMARY -->
+
+<div class="flex justify-between items-center mb-6">
+
+<div class="flex items-center gap-3">
+
+<div class="bg-purple-100 text-purple-600 p-2 rounded-full">
+⚙
+</div>
+
+<div>
+
+<h2 id="issueCount" class="font-bold text-lg">0 Issues</h2>
+
+<p class="text-sm text-gray-500">
+Track and manage your project issues
+</p>
+
+</div>
+
+</div>
+
+<div class="text-sm">
+
+<span class="text-green-600 mr-4">● Open</span>
+
+<span class="text-purple-600">● Closed</span>
+
+</div>
+
+</div>
+
+
+<!-- LOADER -->
+
+<div id="loader" class="flex justify-center py-10">
+
+<div class="loader"></div>
+
+</div>
+
+
+<!-- ISSUE GRID -->
+
+<div id="issuesContainer" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-5"></div>
+
+</div>
+
+</div>
+
+
+<!-- MODAL -->
+
+<div id="modal" class="modal fixed inset-0 bg-black bg-opacity-40 items-center justify-center">
+
+<div class="bg-white p-6 rounded-lg w-96">
+
+<h2 id="modalTitle" class="font-bold text-xl mb-2"></h2>
+
+<div id="modalStatus" class="flex items-center gap-2 text-sm mb-2"></div>
+
+<div id="modalLabels" class="flex flex-wrap gap-2 mb-4"></div>
+
+<p id="modalDesc" class="text-gray-600 mb-4"></p>
+
+<div class="grid grid-cols-2 gap-4 mb-6">
+
+<div>
+
+<p class="text-gray-600 text-sm">Assignee:</p>
+
+<p id="modalAssignee" class="text-gray-900"></p>
+
+</div>
+
+<div>
+
+<p class="text-gray-600 text-sm">Priority:</p>
+
+<div id="modalPriority"></div>
+
+</div>
+
+</div>
+
+<button onclick="closeModal()" class="bg-purple-600 text-white px-4 py-1 rounded ml-auto block">
+Close
+</button>
+
+</div>
+
+</div>
+
+
+<script>
+
+let issues=[]
+let allIssues=[]
+let currentTab="all"
+
+function debounce(func, delay) {
+  let timeout;
+  return function() {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, arguments), delay);
+  };
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr);
+  return `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
+}
+
+function getLabelClass(label) {
+  const map = {
+    'bug': 'bg-pink-100 text-pink-800',
+    'help wanted': 'bg-yellow-100 text-yellow-800',
+    'enhancement': 'bg-green-100 text-green-800',
+    'good first issue': 'bg-blue-100 text-blue-800',
+    'documentation': 'bg-indigo-100 text-indigo-800',
+  };
+  return map[label.toLowerCase()] || 'bg-gray-200 text-gray-800';
+}
+
+function getPriorityClass(priority) {
+  const map = {
+    'high': 'bg-red-500 text-white',
+    'medium': 'bg-yellow-500 text-white',
+    'low': 'bg-green-500 text-white',
+  };
+  return map[priority.toLowerCase()] || 'bg-gray-500 text-white';
+}
+
+function login(){
+
+const user=document.getElementById("username").value
+const pass=document.getElementById("password").value
+
+if(user==="admin" && pass==="admin123"){
+
+document.getElementById("loginPage").classList.add("hidden")
+document.getElementById("app").classList.remove("hidden")
+
+loadIssues()
+
+}else{
+alert("Invalid Credentials")
+}
+
+}
+
+
+async function loadIssues(){
+
+toggleLoader(true)
+
+const res=await fetch("https://phi-lab-server.vercel.app/api/v1/lab/issues")
+
+const data=await res.json()
+
+allIssues=data.data
+issues=data.data
+
+renderIssues(issues)
+
+toggleLoader(false)
+
+}
+
+
+function renderIssues(list){
+
+const container=document.getElementById("issuesContainer")
+
+container.innerHTML=""
+
+document.getElementById("issueCount").innerText=list.length+" Issues"
+
+list.forEach(issue=>{
+
+const labels = Array.isArray(issue.labels) ? issue.labels : (issue.labels ? [issue.labels] : [])
+
+const labelHTML = labels.map(l => `<span class="inline-flex items-center text-xs ${getLabelClass(l)} px-2 py-1 rounded mr-1"><span class="mr-1">○</span>${l}</span>`).join("")
+
+const border = issue.status === "open" ? "open-border" : "closed-border"
+
+const card = document.createElement("div")
+
+card.className = `issue-card bg-white p-4 rounded shadow ${border}`
+
+card.innerHTML = `
+
+<div class="flex justify-between items-center mb-1">
+
+<h3 class="font-semibold">${issue.title}</h3>
+
+<span class="text-xs ${getPriorityClass(issue.priority)} px-2 py-1 rounded">${issue.priority.toUpperCase()}</span>
+
+</div>
+
+<p class="text-gray-500 text-sm mb-2">
+
+${issue.description.slice(0,80)}...
+
+</p>
+
+<div class="mb-2 flex flex-wrap gap-1">
+
+${labelHTML}
+
+</div>
+
+<div class="text-xs text-gray-500">
+
+#${issue.id} by ${issue.author}<br>
+
+${formatDate(issue.createdAt)}
+
+</div>
+
+`
+
+card.onclick = () => openModal(issue)
+
+container.appendChild(card)
+
+})
+
+}
+
+
+function setTab(type,btn){
+
+currentTab=type
+
+document.querySelectorAll(".tab").forEach(t => {
+
+t.classList.remove("bg-purple-600", "text-white")
+
+t.classList.add("bg-transparent", "text-gray-600")
+
+})
+
+btn.classList.add("bg-purple-600", "text-white")
+
+btn.classList.remove("bg-transparent", "text-gray-600")
+
+filterIssues()
+
+}
+
+
+function filterIssues(){
+
+let filtered = allIssues
+
+if(currentTab === "open"){
+
+filtered = allIssues.filter(i => i.status === "open")
+
+}
+
+if(currentTab === "closed"){
+
+filtered = allIssues.filter(i => i.status === "closed")
+
+}
+
+issues = filtered
+
+renderIssues(filtered)
+
+}
+
+
+async function searchIssues(){
+
+const q = document.getElementById("searchInput").value
+
+if(!q){
+
+issues = allIssues
+
+filterIssues()
+
+return
+
+}
+
+toggleLoader(true)
+
+const res = await fetch(`https://phi-lab-server.vercel.app/api/v1/lab/issues/search?q=${q}`)
+
+const data = await res.json()
+
+issues = data.data
+
+renderIssues(issues)
+
+toggleLoader(false)
+
+}
+
+
+function openModal(issue){
+
+document.getElementById("modal").classList.add("active")
+
+document.getElementById("modalTitle").innerText = issue.title
+
+const statusColor = issue.status === 'open' ? 'green' : 'purple'
+
+const statusText = issue.status === 'open' ? 'Opened' : 'Closed'
+
+document.getElementById("modalStatus").innerHTML = `
+
+<span class="text-${statusColor}-600 font-medium">● ${statusText}</span>
+
+<span class="text-gray-500"> · Opened by ${issue.author} · ${formatDate(issue.createdAt)}</span>
+
+`
+
+const labels = Array.isArray(issue.labels) ? issue.labels : (issue.labels ? [issue.labels] : [])
+
+const labelHTML = labels.map(l => `<span class="inline-flex items-center text-xs ${getLabelClass(l)} px-2 py-1 rounded mr-1"><span class="mr-1">○</span>${l}</span>`).join("")
+
+document.getElementById("modalLabels").innerHTML = labelHTML
+
+document.getElementById("modalDesc").innerText = issue.description
+
+document.getElementById("modalAssignee").innerText = issue.assignee || "N/A"
+
+document.getElementById("modalPriority").innerHTML = `<span class="${getPriorityClass(issue.priority)} px-3 py-1 rounded-full">${issue.priority.toUpperCase()}</span>`
+
+}
+
+
+function closeModal(){
+
+document.getElementById("modal").classList.remove("active")
+
+}
+
+
+function toggleLoader(show){
+
+document.getElementById("loader").style.display = show ? "flex" : "none"
+
+}
+
+document.getElementById("searchInput").addEventListener("input", debounce(searchIssues, 500));
+
+</script>
 
 </body>
 </html>
